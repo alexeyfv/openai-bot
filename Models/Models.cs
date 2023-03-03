@@ -1,5 +1,13 @@
 namespace ChatGptBot.Models;
 
-public record ChatGptQuestion(string Question);
+public record ChatGptRequest(IEnumerable<ChatMessage> Messages);
 
-public record ChatGptAnswer(string Answer);
+public record ChatGptResponse(string Answer);
+
+public record ChatMessage(Role Role, string Text);
+
+public enum Role
+{
+    User,
+    Assistant
+}

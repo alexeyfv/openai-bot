@@ -7,23 +7,28 @@ namespace ChatGptBot.Handlers;
 public class TelegramHandler : IHandler<Update>
 {
     private readonly ILogger<Worker> logger;
-    private readonly IHandler<ChatGptQuestion, ChatGptAnswer> chatGptHandler;
-    private readonly ITelegramBotClient telegramBotClient;
+    private readonly IHandler<ChatGptRequest, ChatGptResponse> chatGptHandler;
+    private readonly ITelegramBotClient bot;
+    private HashSet<long> ids = new()
+    {
+    };
+
+    private HashSet<string> usernames = new()
+    {
+    };
 
     public TelegramHandler(
         ILogger<Worker> logger,
-        IHandler<ChatGptQuestion, ChatGptAnswer> chatGptHandler,
-        ITelegramBotClient telegramBotClient)
+        IHandler<ChatGptRequest, ChatGptResponse> chatGptHandler,
+        ITelegramBotClient bot)
     {
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         this.chatGptHandler = chatGptHandler ?? throw new ArgumentNullException(nameof(chatGptHandler));
-        this.telegramBotClient = telegramBotClient ?? throw new ArgumentNullException(nameof(telegramBotClient));
+        this.bot = bot ?? throw new ArgumentNullException(nameof(bot));
     }
 
     public async Task HandleAsync(Update r)
     {
-        // TODO: Add user validation
-
         if (r.Message == null)
         {
             logger.LogDebug($"'{nameof(r.Message)}' is null");
@@ -37,24 +42,63 @@ public class TelegramHandler : IHandler<Update>
             logger.LogDebug($"'{nameof(m.From)}' is null");
             return;
         }
-        if (string.IsNullOrWhiteSpace(m.Text))
+
+        var id = m.Chat.Id;
+
+        // Validate against allowed users
+        if (!string.IsNullOrWhiteSpace(m.From.Username) &&
+            !usernames.Contains(m.From.Username) &&
+            !ids.Contains(id))
         {
-            logger.LogDebug($"'{nameof(m.Text)}' is null or whitespace");
+            await bot.SendTextMessageAsync(id, $"@{m.From.Username}, you don't have access 🙅🏻‍♂️");
             return;
         }
 
-        var from = m.From;
+        var list = new List<ChatMessage>();
+        HandleRecursively(r.Message, list);
 
-        var id = from.Id.ToString();
-        var username = from.Username;
-        var firstName = from.FirstName;
-        var lastName = from.LastName;
-        var text = m.Text;
+        if (list.Count == 0) return;
 
-        logger.LogDebug($"Message '{text}' received from {firstName} {lastName} (id = '{id}', username = '{username}')");
+        var response = await chatGptHandler.HandleAsync(new ChatGptRequest(list));
 
-        var response = await chatGptHandler.HandleAsync(new ChatGptQuestion(text));
+        await bot.SendTextMessageAsync(id, response.Answer, replyToMessageId: m.MessageId);
+    }
 
-        await telegramBotClient.SendTextMessageAsync(id, response.Answer);
+    private void HandleRecursively(Message m, List<ChatMessage> messages)
+    {
+        if (m.ReplyToMessage is not null) HandleRecursively(m.ReplyToMessage, messages);
+
+        if (m.From == null)
+        {
+            logger.LogDebug($"'{nameof(m.From)}' is null");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(m.Text))
+        {
+            logger.LogDebug($"Message text cannot be empty");
+            return;
+        }
+
+        var role = m.From.IsBot ? Role.Assistant : Role.User;
+        messages.Add(new ChatMessage(role, RemoveCommand(m.Text)));
+    }
+
+    private string RemoveCommand(string text)
+    {
+        // Check if the message starts with '/<command>@<id>'
+        if (text.StartsWith('/'))
+        {
+            // Find the first space character in the message
+            int spaceIndex = text.IndexOf(' ');
+
+            // If there is no space character, the message does not contain any text after the command
+            if (spaceIndex == -1) return text;
+
+            // Get the substring that starts after the first space character
+            return text.Substring(spaceIndex + 1);
+        }
+
+        return text;
     }
 }

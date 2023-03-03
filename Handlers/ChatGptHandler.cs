@@ -4,7 +4,7 @@ using RestSharp;
 
 namespace ChatGptBot.Handlers;
 
-public class ChatGptHandler : IHandler<ChatGptQuestion, ChatGptAnswer>
+public class ChatGptHandler : IHandler<ChatGptRequest, ChatGptResponse>
 {
     private readonly ILogger<Worker> logger;
     private readonly RestClient client;
@@ -17,7 +17,7 @@ public class ChatGptHandler : IHandler<ChatGptQuestion, ChatGptAnswer>
         this.client = restClient ?? throw new ArgumentNullException(nameof(restClient));
     }
 
-    public Task<ChatGptAnswer> HandleAsync(ChatGptQuestion r)
+    public Task<ChatGptResponse> HandleAsync(ChatGptRequest r)
     {
         var token = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ??
             throw new InvalidOperationException("OPENAI_API_KEY doesn't exist");
@@ -26,33 +26,44 @@ public class ChatGptHandler : IHandler<ChatGptQuestion, ChatGptAnswer>
         request.AddHeader("Authorization", $"Bearer {token}");
         request.AddHeader("Content-Type", "application/json");
 
-        var body = new { model = "gpt-3.5-turbo", messages = new[] { new { role = "user", content = r.Question } } };
+        var messages = r.Messages.Select(m => new
+        {
+            role = m.Role switch
+            {
+                Role.Assistant => "assistant",
+                Role.User => "user",
+                _ => throw new NotImplementedException()
+            },
+            content = m.Text
+        });
+
+        var body = new { model = "gpt-3.5-turbo", messages = messages };
         request.AddParameter("application/json", body, ParameterType.RequestBody);
 
         var resp = client.Execute(request);
 
-        ChatGptAnswer answer;
+        ChatGptResponse answer;
 
         if (resp == null)
         {
-            answer = new ChatGptAnswer("Response is null");
+            logger.LogDebug($"OpenAI API request failed'");
+            answer = new ChatGptResponse("Response is null");
         }
         else if (resp.IsSuccessful && resp.Content != null)
         {
-            logger.LogDebug($"Response is successful. Content: '{resp.ToString()}'");
-            var response = JsonSerializer.Deserialize<ChatGptResponse>(resp.Content);
-            answer = new ChatGptAnswer(response?.choices.FirstOrDefault()?.message.content ?? "Empty");
+            var response = JsonSerializer.Deserialize<Response>(resp.Content);
+            answer = new ChatGptResponse(response?.choices.FirstOrDefault()?.message.content ?? "Empty");
         }
         else
         {
-            logger.LogDebug($"Error {resp.ErrorMessage}");
-            answer = new ChatGptAnswer(resp.ErrorException?.Message ?? "Empty error message");
+            logger.LogDebug($"OpenAI API request failed {resp.Content}");
+            answer = new ChatGptResponse(resp.ErrorException?.Message ?? "Empty error message");
         }
 
         return Task.FromResult(answer);
     }
 
-    private class ChatGptResponse
+    private class Response
     {
         public string id { get; init; } = string.Empty;
         public string @object { get; init; } = string.Empty;
