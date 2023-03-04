@@ -1,15 +1,15 @@
 using System.Text.Json;
-using ChatGptBot.Models;
+using OpenAiBot.Models;
 using RestSharp;
 
-namespace ChatGptBot.Handlers;
+namespace OpenAiBot.Handlers;
 
-public class ChatGptHandler : IHandler<ChatGptRequest, ChatGptResponse>
+public class OpenAiHandler : IHandler<OpenAiRequest, OpenAiResponse>
 {
     private readonly ILogger<Worker> logger;
     private readonly RestClient client;
 
-    public ChatGptHandler(
+    public OpenAiHandler(
         ILogger<Worker> logger,
         RestClient restClient)
     {
@@ -17,7 +17,7 @@ public class ChatGptHandler : IHandler<ChatGptRequest, ChatGptResponse>
         this.client = restClient ?? throw new ArgumentNullException(nameof(restClient));
     }
 
-    public Task<ChatGptResponse> HandleAsync(ChatGptRequest r)
+    public Task<OpenAiResponse> HandleAsync(OpenAiRequest r)
     {
         var token = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ??
             throw new InvalidOperationException("OPENAI_API_KEY doesn't exist");
@@ -42,22 +42,22 @@ public class ChatGptHandler : IHandler<ChatGptRequest, ChatGptResponse>
 
         var resp = client.Execute(request);
 
-        ChatGptResponse answer;
+        OpenAiResponse answer;
 
         if (resp == null)
         {
             logger.LogDebug($"OpenAI API request failed'");
-            answer = new ChatGptResponse("Response is null");
+            answer = new OpenAiResponse("Response is null");
         }
         else if (resp.IsSuccessful && resp.Content != null)
         {
             var response = JsonSerializer.Deserialize<Response>(resp.Content);
-            answer = new ChatGptResponse(response?.choices.FirstOrDefault()?.message.content ?? "Empty");
+            answer = new OpenAiResponse(response?.choices.FirstOrDefault()?.message.content ?? "Empty");
         }
         else
         {
             logger.LogDebug($"OpenAI API request failed {resp.Content}");
-            answer = new ChatGptResponse(resp.ErrorException?.Message ?? "Empty error message");
+            answer = new OpenAiResponse(resp.ErrorException?.Message ?? "Empty error message");
         }
 
         return Task.FromResult(answer);

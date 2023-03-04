@@ -24,4 +24,4 @@ WORKDIR /app
 COPY --from=build-env /app/out ./
 
 # Start the worker service
-ENTRYPOINT ["dotnet", "chatgpt-bot.dll"]
+ENTRYPOINT ["dotnet", "openai-bot.dll"]

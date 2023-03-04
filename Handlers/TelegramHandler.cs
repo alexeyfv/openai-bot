@@ -1,13 +1,13 @@
-using ChatGptBot.Models;
+using OpenAiBot.Models;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
-namespace ChatGptBot.Handlers;
+namespace OpenAiBot.Handlers;
 
 public class TelegramHandler : IHandler<Update>
 {
     private readonly ILogger<Worker> logger;
-    private readonly IHandler<ChatGptRequest, ChatGptResponse> chatGptHandler;
+    private readonly IHandler<OpenAiRequest, OpenAiResponse> openAiHandler;
     private readonly ITelegramBotClient bot;
     private HashSet<long> ids = new()
     {
@@ -19,11 +19,11 @@ public class TelegramHandler : IHandler<Update>
 
     public TelegramHandler(
         ILogger<Worker> logger,
-        IHandler<ChatGptRequest, ChatGptResponse> chatGptHandler,
+        IHandler<OpenAiRequest, OpenAiResponse> openAiHandler,
         ITelegramBotClient bot)
     {
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        this.chatGptHandler = chatGptHandler ?? throw new ArgumentNullException(nameof(chatGptHandler));
+        this.openAiHandler = openAiHandler ?? throw new ArgumentNullException(nameof(openAiHandler));
         this.bot = bot ?? throw new ArgumentNullException(nameof(bot));
     }
 
@@ -59,7 +59,7 @@ public class TelegramHandler : IHandler<Update>
 
         if (list.Count == 0) return;
 
-        var response = await chatGptHandler.HandleAsync(new ChatGptRequest(list));
+        var response = await openAiHandler.HandleAsync(new OpenAiRequest(list));
 
         await bot.SendTextMessageAsync(id, response.Answer, replyToMessageId: m.MessageId);
     }

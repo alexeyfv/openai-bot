@@ -1,10 +1,12 @@
 ﻿{
   "profiles": {
-    "chatgpt_bot": {
+    "openai_bot": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "environmentVariables": {
-        "DOTNET_ENVIRONMENT": "Development"
+        "DOTNET_ENVIRONMENT": "Development",
+        "TELEGRAM_TOKEN": "",
+        "OPENAI_API_KEY": ""
       }
     }
   }

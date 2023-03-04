@@ -1,10 +1,10 @@
-using ChatGptBot.Handlers;
+using OpenAiBot.Handlers;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
-namespace ChatGptBot;
+namespace OpenAiBot;
 
 public class Worker : BackgroundService
 {

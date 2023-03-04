@@ -4,8 +4,8 @@
     <TargetFramework>net7.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>dotnet-chatgpt_bot-af9fb0fe-a103-4ad7-ba63-715ca51f2812</UserSecretsId>
-    <RootNamespace>ChatGptBot</RootNamespace>
+    <UserSecretsId>dotnet-openai_bot-af9fb0fe-a103-4ad7-ba63-715ca51f2812</UserSecretsId>
+    <RootNamespace>OpenAiBot</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

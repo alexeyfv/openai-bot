@@ -1,8 +1,8 @@
-namespace ChatGptBot.Models;
+namespace OpenAiBot.Models;
 
-public record ChatGptRequest(IEnumerable<ChatMessage> Messages);
+public record OpenAiRequest(IEnumerable<ChatMessage> Messages);
 
-public record ChatGptResponse(string Answer);
+public record OpenAiResponse(string Answer);
 
 public record ChatMessage(Role Role, string Text);
 

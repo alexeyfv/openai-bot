@@ -1,4 +1,4 @@
-namespace ChatGptBot.Handlers;
+namespace OpenAiBot.Handlers;
 
 public interface IHandler<TRequest>
 {
