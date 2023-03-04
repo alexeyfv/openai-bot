@@ -6,7 +6,7 @@ A simple service for connecting `Telegram Bot` to the `Open AI API`.
 
 Required tools:
 
-- .NET 7 
+- .NET 7
 - Docker (if you want to run in Docker container)
 
 ## Usage
@@ -15,13 +15,13 @@ Required tools:
 
 1. Specify environment variables, for example in `launchSettings.json`
 
-``` json
-"environmentVariables": {
-  "DOTNET_ENVIRONMENT": "Development",
-  "TELEGRAM_TOKEN": "YOUR_TOKEN_HERE",
-  "OPENAI_API_KEY": "YOUR_TOKEN_HERE"
-}
-```
+    ``` json
+    "environmentVariables": {
+      "DOTNET_ENVIRONMENT": "Development",
+      "TELEGRAM_TOKEN": "YOUR_TOKEN_HERE",
+      "OPENAI_API_KEY": "YOUR_TOKEN_HERE"
+    }
+    ```
 
 2. Execute `dotnet run`
 
