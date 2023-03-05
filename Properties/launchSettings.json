@@ -6,7 +6,9 @@
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development",
         "TELEGRAM_TOKEN": "",
-        "OPENAI_API_KEY": ""
+        "OPENAI_API_KEY": "",
+        "DBPATH": "./database/local.sqlite",
+        "BOT_NAME": ""
       }
     }
   }

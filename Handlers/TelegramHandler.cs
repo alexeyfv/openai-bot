@@ -1,104 +1,74 @@
+using OpenAiBot.DataAccess;
 using OpenAiBot.Models;
 using Telegram.Bot;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 
 namespace OpenAiBot.Handlers;
 
 public class TelegramHandler : IHandler<Update>
 {
     private readonly ILogger<Worker> logger;
-    private readonly IHandler<OpenAiRequest, OpenAiResponse> openAiHandler;
+    private readonly IHandler<ChatCommand, string> commandHandler;
+    private readonly IHandler<ChatMessage, string> messageHandler;
     private readonly ITelegramBotClient bot;
-    private HashSet<long> ids = new()
-    {
-    };
-
-    private HashSet<string> usernames = new()
-    {
-    };
+    private readonly BotInfo botInfo;
+    private readonly IRepository db;
 
     public TelegramHandler(
         ILogger<Worker> logger,
-        IHandler<OpenAiRequest, OpenAiResponse> openAiHandler,
-        ITelegramBotClient bot)
+        IHandler<ChatCommand, string> commandHandler,
+        IHandler<ChatMessage, string> messageHandler,
+        ITelegramBotClient bot,
+        BotInfo botInfo,
+        IRepository db)
     {
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        this.openAiHandler = openAiHandler ?? throw new ArgumentNullException(nameof(openAiHandler));
+        this.commandHandler = commandHandler ?? throw new ArgumentNullException(nameof(commandHandler));
+        this.messageHandler = messageHandler ?? throw new ArgumentNullException(nameof(messageHandler));
         this.bot = bot ?? throw new ArgumentNullException(nameof(bot));
+        this.botInfo = botInfo ?? throw new ArgumentNullException(nameof(botInfo));
+        this.db = db ?? throw new ArgumentNullException(nameof(db));
     }
 
     public async Task HandleAsync(Update r)
     {
-        if (r.Message == null)
+        if (r.Message == null ||
+            r.Message.From == null ||
+            string.IsNullOrWhiteSpace(r.Message.Text))
         {
-            logger.LogDebug($"'{nameof(r.Message)}' is null");
+            logger.LogDebug($"Invalid message");
             return;
         }
 
-        var m = r.Message;
+        var msg = r.Message;
+        var messageId = msg.MessageId;
+        var chatId = msg.Chat.Id;
+        var userId = msg.From.Id;
+        var text = msg.Text;
 
-        if (m.From == null)
+        if (msg.Entities is not null &&
+            msg.Entities.Length > 0 &&
+            msg.Entities[0].Type == MessageEntityType.BotCommand)
         {
-            logger.LogDebug($"'{nameof(m.From)}' is null");
-            return;
+            // Commands
+            var response = await commandHandler.HandleAsync(new ChatCommand(chatId, userId, text));
+            if (string.IsNullOrWhiteSpace(response)) return;
+            await bot.SendTextMessageAsync(chatId, response, replyToMessageId: messageId, parseMode: ParseMode.Html);
         }
-
-        var id = m.Chat.Id;
-
-        // Validate against allowed users
-        if (!string.IsNullOrWhiteSpace(m.From.Username) &&
-            !usernames.Contains(m.From.Username) &&
-            !ids.Contains(id))
+        else if (msg.Chat.Type == ChatType.Private)
         {
-            await bot.SendTextMessageAsync(id, $"@{m.From.Username}, you don't have access 🙅🏻‍♂️");
-            return;
+            // One to one chat
+            var response = await messageHandler.HandleAsync(new ChatMessage(chatId, userId, text));
+            if (string.IsNullOrWhiteSpace(response)) return;
+            await bot.SendTextMessageAsync(chatId, response, replyToMessageId: messageId);
         }
-
-        var list = new List<ChatMessage>();
-        HandleRecursively(r.Message, list);
-
-        if (list.Count == 0) return;
-
-        var response = await openAiHandler.HandleAsync(new OpenAiRequest(list));
-
-        await bot.SendTextMessageAsync(id, response.Answer, replyToMessageId: m.MessageId);
-    }
-
-    private void HandleRecursively(Message m, List<ChatMessage> messages)
-    {
-        if (m.ReplyToMessage is not null) HandleRecursively(m.ReplyToMessage, messages);
-
-        if (m.From == null)
+        else if(text.StartsWith($"@{botInfo.Name}"))
         {
-            logger.LogDebug($"'{nameof(m.From)}' is null");
-            return;
+            // Groups (only if bot was mentioned)
+            var response = await messageHandler.HandleAsync(new ChatMessage(chatId, userId, text));
+            if (string.IsNullOrWhiteSpace(response)) return;
+            await bot.SendTextMessageAsync(chatId, response, replyToMessageId: messageId);
         }
-
-        if (string.IsNullOrWhiteSpace(m.Text))
-        {
-            logger.LogDebug($"Message text cannot be empty");
-            return;
-        }
-
-        var role = m.From.IsBot ? Role.Assistant : Role.User;
-        messages.Add(new ChatMessage(role, RemoveCommand(m.Text)));
-    }
-
-    private string RemoveCommand(string text)
-    {
-        // Check if the message starts with '/<command>@<id>'
-        if (text.StartsWith('/'))
-        {
-            // Find the first space character in the message
-            int spaceIndex = text.IndexOf(' ');
-
-            // If there is no space character, the message does not contain any text after the command
-            if (spaceIndex == -1) return text;
-
-            // Get the substring that starts after the first space character
-            return text.Substring(spaceIndex + 1);
-        }
-
-        return text;
     }
 }

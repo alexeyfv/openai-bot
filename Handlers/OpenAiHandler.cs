@@ -7,23 +7,23 @@ namespace OpenAiBot.Handlers;
 public class OpenAiHandler : IHandler<OpenAiRequest, OpenAiResponse>
 {
     private readonly ILogger<Worker> logger;
+    private readonly OpenAiInfo openAiInfo;
     private readonly RestClient client;
 
     public OpenAiHandler(
         ILogger<Worker> logger,
+        OpenAiInfo openAiInfo,
         RestClient restClient)
     {
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.openAiInfo = openAiInfo ?? throw new ArgumentNullException(nameof(openAiInfo));
         this.client = restClient ?? throw new ArgumentNullException(nameof(restClient));
     }
 
     public Task<OpenAiResponse> HandleAsync(OpenAiRequest r)
     {
-        var token = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ??
-            throw new InvalidOperationException("OPENAI_API_KEY doesn't exist");
-
         var request = new RestRequest("/chat/completions", Method.Post);
-        request.AddHeader("Authorization", $"Bearer {token}");
+        request.AddHeader("Authorization", $"Bearer {openAiInfo.Token}");
         request.AddHeader("Content-Type", "application/json");
 
         var messages = r.Messages.Select(m => new
@@ -40,27 +40,27 @@ public class OpenAiHandler : IHandler<OpenAiRequest, OpenAiResponse>
         var body = new { model = "gpt-3.5-turbo", messages = messages };
         request.AddParameter("application/json", body, ParameterType.RequestBody);
 
-        var resp = client.Execute(request);
+        var response = client.Execute(request);
+        var result = ProcessResponse(response);
+        return Task.FromResult(result);
+    }
 
-        OpenAiResponse answer;
-
-        if (resp == null)
-        {
-            logger.LogDebug($"OpenAI API request failed'");
-            answer = new OpenAiResponse("Response is null");
-        }
+    private OpenAiResponse ProcessResponse(RestResponse resp)
+    {
+        if (resp == null) logger.LogError($"OpenAI API request failed'");
         else if (resp.IsSuccessful && resp.Content != null)
         {
-            var response = JsonSerializer.Deserialize<Response>(resp.Content);
-            answer = new OpenAiResponse(response?.choices.FirstOrDefault()?.message.content ?? "Empty");
+            var data = JsonSerializer.Deserialize<Response>(resp.Content);
+            if (data != null)
+            {
+                var answer = data.choices.FirstOrDefault()?.message.content ?? "Empty";
+                var tokens = data.usage.total_tokens;
+                return new OpenAiResponse(answer.Trim(), tokens);
+            }
+            logger.LogError($"Deserializing Error: {resp.Content}");
         }
-        else
-        {
-            logger.LogDebug($"OpenAI API request failed {resp.Content}");
-            answer = new OpenAiResponse(resp.ErrorException?.Message ?? "Empty error message");
-        }
-
-        return Task.FromResult(answer);
+        else logger.LogError($"OpenAI API request failed {resp.Content}");
+        return new OpenAiResponse("Error occurred :( We are working to fix this", 0);
     }
 
     private class Response

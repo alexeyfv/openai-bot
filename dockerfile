@@ -15,7 +15,7 @@ COPY . ./
 RUN dotnet publish -c Release -o out
 
 # Start with a new image that just includes .NET Core runtime
-FROM mcr.microsoft.com/dotnet/runtime:7.0
+FROM mcr.microsoft.com/dotnet/runtime:7.0-alpine
 
 # Set the working directory to /app
 WORKDIR /app
