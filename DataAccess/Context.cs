@@ -26,7 +26,7 @@ public class Context : DbContext
             {
                 Id = long.MaxValue,
                 MaxRequests = 50,
-                MaxTokenProcessed = 2056
+                MaxTokenProcessed = 65536
             }
         });
     }
